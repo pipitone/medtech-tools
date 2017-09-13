@@ -148,7 +148,7 @@ def create_week_summary_page(ical_data, login, date):
     for date in sorted(weekday_events.keys()):
         log("Fetching content for date {}", date)
         _body.add(h1(date.strftime("%a, %b %d %Y"), _class="date"))
-        _datediv = div(style='padding-left: 10px; margin-bottom: 40px;')
+        _datediv = div(style='padding-left: 10px; margin-bottom: 3em; clear: both; float: left;')
         _body.add(_datediv)
 
         for event in weekday_events[date]:
@@ -195,8 +195,6 @@ def create_week_summary_page(ical_data, login, date):
 
                     if TESTMODE and len(_datediv.get()) >= 3: 
                         break
-        if TESTMODE: 
-            break
 
     # a disclaimer
     with _body.add(div(style="clear: both;")):
