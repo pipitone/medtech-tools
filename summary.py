@@ -17,8 +17,10 @@ Options:
     --ical URL          [default: http://meds.queensu.ca/central/calendars/2020.ics]
     --pre-post-week     Emit pages for the week, previous and following week
     --link-index-html   Link index.html to the current summary page
+    --site-base URL     [default: http://jon.pipitone.ca/medtech]
     --verbose           
     --debug
+    --test-mode
 """
 from bs4 import BeautifulSoup
 from dominate.tags import *
@@ -32,15 +34,17 @@ import getpass
 import icalendar as ical
 import os
 import os.path
+import urlparse
 import requests
 import time
 
 # SITE_BASE and MT_BASE are base urls for the summary page site and medtech,
 # respectively.
 MT_BASE = "http://meds.queensu.ca/central"
-SITE_BASE = "http://jon.pipitone.ca/medtech"
+SITE_BASE = ""
 VERBOSE = False
 DEBUG = False
+TESTMODE=False
 
 def log(message, *args):
     if VERBOSE or DEBUG:
@@ -99,7 +103,26 @@ def create_week_summary_page(ical_data, login, date):
                           src="/central/javascript/jquery/jquery.min.js?release=4.6.0.0"))
 
     # some custome styling
-    _html.head.add(style("body { margin: auto 10%; }", type="text/css"))
+    _html.head.add(style("""
+        body { margin: auto 10%; }; 
+
+        .no-prep h2 { 
+            color: lightgrey; 
+        } 
+
+        .date, .event, .event-heading, .event-prep { 
+            clear: both; 
+        }
+        .event-todo, .event-title {
+            float: left;
+        }
+        .event-todo input { 
+            margin: 20px 10px;
+        }
+        .event-prep { 
+            padding-left: 40px;
+        } 
+        """, type="text/css"))
     _html.head.add(meta(charset="utf-8"))
     _body = _html.body
 
@@ -108,7 +131,7 @@ def create_week_summary_page(ical_data, login, date):
         "background-color: rgba(255,255,25,0.1); border: thin dashed lightgrey;")):
 
         span("Note:", _class="label label-important event-resource-stat-label")
-        text(" Click event/date headings to see required/optional preparation")
+        text("Click event headings to see preparation notes and materials")
 
     # links for navigation from week to week
     with _body.add(div(style="overflow:hidden")):
@@ -120,45 +143,65 @@ def create_week_summary_page(ical_data, login, date):
     # finally, create the content
     for date in sorted(weekday_events.keys()):
         log("Fetching content for date {}", date)
-        _body.add(h1(date.strftime("%a, %b %d %Y")))
+        _body.add(h1(date.strftime("%a, %b %d %Y"), _class="date"))
         _datediv = div(style='padding-left: 10px; margin-bottom: 40px;')
         _body.add(_datediv)
 
         for event in weekday_events[date]:
-            _datediv.add(h2(
-                raw('&#9658; '),
-                event.decoded('summary'),
-                a(
-                    img(src='http://upload.wikimedia.org/wikipedia/commons/6/64/Icon_External_Link.png'),
-                    href=event['url'], style="font-size: x-small", target="_blank")
-            ))
-            _eventdiv = div(style='padding-left: 10px;')
-            _datediv.add(_eventdiv)
+            eventurl = event['url']
+            parsedurl = urlparse.urlparse(eventurl)
+            parsedquery = urlparse.parse_qs(parsedurl.query)
+            eventid = parsedquery["id"][0]
 
-            # fetch the medtech page content for the date
-            debug("Fetching event page: {}", event['url'])
-            page = requests.post(event['url'], data=login)
-            soup = BeautifulSoup(page.text, 'html.parser')
-            
-            debug("Fetched content: {}", page.text)
+            with _datediv.add(div(_class="event")) as event_div: 
+                with div(_class="event-heading") as event_heading:
+                    with div(_class="event-todo"): 
+                        input_(id="chk_{}".format(eventid), type="checkbox", _class="todo"),
+                    with div(_class="event-title"):
+                        h2(
+                            event.decoded('summary'),
+                            a(
+                                img(src='http://upload.wikimedia.org/wikipedia/commons/6/64/Icon_External_Link.png'),
+                                href=event['url'], style="font-size: x-small", target="_blank")
+                        )
 
-            # extract the "required preparation" section
-            req= soup.find_all("h3", text="Required Preparation")
-            if req:
-                req.extend([e for e in req[0].next_siblings])
-                _eventdiv.add(div(raw("".join(map(unicode, req)))))
+                with div(_class="event-prep") as prep_div:
+                    # fetch the medtech page content for the date
+                    debug("Fetching event page: {}", eventurl)
+                    page = requests.post(eventurl, data=login)
+                    soup = BeautifulSoup(page.text, 'html.parser')
+                    
+                    has_prep = False 
 
-            # extract the event resources
-            res = soup.find(id='event-resources-container')
-            if res:
-                _eventdiv.add(div(raw("".join(map(unicode, res)))))
+                    # extract the "required preparation" section
+                    req = soup.find_all("h3", text="Required Preparation")
+                    if req:
+                        req.extend([e for e in req[0].next_siblings])
+                        div(raw("".join(map(unicode, req))))
+                        has_prep = True
+
+                    # extract the event resources
+                    res = soup.find(id='event-resources-container')
+                    if res:
+                        div(raw("".join(map(unicode, res))))
+                        has_prep = True
+
+                    if not has_prep:
+                        event_heading['class'] += ' no-prep'
+
+                    if TESTMODE and len(_datediv.get()) >= 3: 
+                        break
+        if TESTMODE: 
+            break
 
     # a disclaimer
-    with _body.add(div(style="margin: 10px; padding: 15px")):
+    with _body.add(div(style="margin: 10px; padding: 15px; clear: both; ")):
         p("Last Updated: {}".format(datetime.datetime.now()))
-        p("DISCLAIMER: Don't trust any of this.",
+        p("DISCLAIMER: Don't trust any of this. ",
           "If you fail medical school because you trust this, it's not on me. :D")
-
+        p("Contribute or suggest features/bugs at",
+            a("github.com/pipitone/medtech-tools",
+                href="https://github.com/pipitone/medtech-tools"))
 
     # inject some sweet javscript that makes headings collapse/expand
     # visibility of their associated content
@@ -169,10 +212,10 @@ def create_week_summary_page(ical_data, login, date):
         });
     });
 
-    $('h2').each(function(index, element) {
-        $(this).next('div').hide();
+    $('.event-title').each(function(index, element) {
+        $(this).parent('.event-heading').next('.event-prep').hide();
         $(this).click(function() { 
-            $(this).next('div').toggle();
+            $(this).parent('.event-heading').next('.event-prep').toggle();
         });
     });
 
@@ -182,20 +225,30 @@ def create_week_summary_page(ical_data, login, date):
         });
     })
 
+    $('.todo').each(function(index, element) {
+        $(this).checked = localStorage.getItem($(this).id) == 'true';
+        $(this).change(function() { 
+            localStorage.setItem($(this).id, $(this).checked);
+        });
+    });
+
     // $('ul.timeframe-during').hide();
     // $('ul.timeframe-post').hide();
     // $('ul.timeframe-none').hide();
     """
-    _html.body.add(script(js, type="text/javascript"))
-    _html.body.add(script("""
-        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
-        ga('create', 'UA-84357249-1', 'auto');
-        ga('send', 'pageview');
-        """, type="text/javascript"))
+    with _html.body: 
+        script(js, type="text/javascript")
+        script("""
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-84357249-1', 'auto');
+            ga('send', 'pageview');
+            """, type="text/javascript")
+
 
     pagefile = open(outputfile, 'wb')
     pagefile.write(_html.__unicode__().encode('utf8'))
@@ -204,10 +257,12 @@ def create_week_summary_page(ical_data, login, date):
 
 
 def main():
-    global VERBOSE, DEBUG
+    global VERBOSE, DEBUG, TESTMODE, SITE_BASE
     arguments = docopt.docopt(__doc__)
     VERBOSE = arguments['--verbose']
     DEBUG = arguments['--debug']
+    TESTMODE = arguments['--test-mode']
+    SITE_BASE = arguments['--site-base']
 
     nowdate = arguments['<date>'] and dateutil.parser.parse(
         arguments['<date>']) or datetime.datetime.now()
