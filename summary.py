@@ -226,9 +226,9 @@ def create_week_summary_page(ical_data, login, date):
     })
 
     $('.todo').each(function(index, element) {
-        $(this).checked = localStorage.getItem($(this).id) == 'true';
+        $(this).prop('checked', localStorage.getItem($(this).attr('id')) == 'true');
         $(this).change(function() { 
-            localStorage.setItem($(this).id, $(this).checked);
+            localStorage.setItem($(this).attr('id'), $(this).prop('checked'));
         });
     });
 
