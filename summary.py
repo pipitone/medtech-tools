@@ -122,6 +122,10 @@ def create_week_summary_page(ical_data, login, date):
         .event-prep { 
             padding-left: 40px;
         } 
+
+        .icon-globe { 
+            vertical-align: baseline;
+        }
         """, type="text/css"))
     _html.head.add(meta(charset="utf-8"))
     _body = _html.body
@@ -131,7 +135,7 @@ def create_week_summary_page(ical_data, login, date):
         "background-color: rgba(255,255,25,0.1); border: thin dashed lightgrey;")):
 
         span("Note:", _class="label label-important event-resource-stat-label")
-        text("Click event headings to see preparation notes and materials")
+        text(" Click event headings to see preparation notes and materials.")
 
     # links for navigation from week to week
     with _body.add(div(style="overflow:hidden")):
@@ -161,7 +165,7 @@ def create_week_summary_page(ical_data, login, date):
                         h2(
                             event.decoded('summary'),
                             a(
-                                img(src='http://upload.wikimedia.org/wikipedia/commons/6/64/Icon_External_Link.png'),
+                                span(_class="icon-globe"),
                                 href=event['url'], style="font-size: x-small", target="_blank")
                         )
 
@@ -195,10 +199,12 @@ def create_week_summary_page(ical_data, login, date):
             break
 
     # a disclaimer
-    with _body.add(div(style="margin: 10px; padding: 15px; clear: both; ")):
+    with _body.add(div(style="clear: both;")):
+        hr()
         p("Last Updated: {}".format(datetime.datetime.now()))
-        p("DISCLAIMER: Don't trust any of this. ",
-          "If you fail medical school because you trust this, it's not on me. :D")
+        p("""DISCLAIMER: Don't trust any of this. Updates occur once daily and
+        reflect whatever MedTech is showing at that time. To Do list state is
+        stored in your browser only.""")
         p("Contribute or suggest features/bugs at",
             a("github.com/pipitone/medtech-tools",
                 href="https://github.com/pipitone/medtech-tools"))
@@ -219,22 +225,12 @@ def create_week_summary_page(ical_data, login, date):
         });
     });
 
-    $('.timeframe-heading').each(function(index, element) {
-        $(this).click(function() { 
-            $(this).next('ul').toggle();
-        });
-    })
-
     $('.todo').each(function(index, element) {
         $(this).prop('checked', localStorage.getItem($(this).attr('id')) == 'true');
         $(this).change(function() { 
             localStorage.setItem($(this).attr('id'), $(this).prop('checked'));
         });
     });
-
-    // $('ul.timeframe-during').hide();
-    // $('ul.timeframe-post').hide();
-    // $('ul.timeframe-none').hide();
     """
 
     with _html.body: 
@@ -248,7 +244,6 @@ def create_week_summary_page(ical_data, login, date):
             ga('create', 'UA-84357249-1', 'auto');
             ga('send', 'pageview');
             """, type="text/javascript")
-
 
     pagefile = open(outputfile, 'wb')
     pagefile.write(_html.__unicode__().encode('utf8'))
