@@ -48,11 +48,11 @@ TESTMODE=False
 
 def log(message, *args):
     if VERBOSE or DEBUG:
-        print(message.format(*args))
+        print(str(message).format(*args))
 
 def debug(message, *args): 
     if DEBUG:
-        print("DEBUG: " + message.format(*args))
+        print("DEBUG: " + str(message).format(*args))
 
 def create_week_summary_page(ical_data, login, date):
     """Do the work of create the summary page
@@ -104,7 +104,9 @@ def create_week_summary_page(ical_data, login, date):
 
     # some custome styling
     _html.head.add(style("""
-        body { margin: auto 10%; }; 
+        body { 
+            margin: auto 10%; 
+        }
 
         .no-prep h2 { 
             color: lightgrey; 
@@ -166,7 +168,8 @@ def create_week_summary_page(ical_data, login, date):
                             event.decoded('summary'),
                             a(
                                 span(_class="icon-globe"),
-                                href=event['url'], style="font-size: x-small", target="_blank")
+                                href=event['url'], style="font-size: x-small",
+                                target="_blank"), 
                         )
 
                 with div(_class="event-prep") as prep_div:
@@ -185,9 +188,9 @@ def create_week_summary_page(ical_data, login, date):
                         has_prep = True
 
                     # extract the event resources
-                    res = soup.find(id='event-resources-container')
-                    if res:
-                        div(raw("".join(map(unicode, res))))
+                    res = soup.find_all(class_='resource-list')
+                    for reslist in res: 
+                        raw(unicode(reslist))
                         has_prep = True
 
                     if not has_prep:
