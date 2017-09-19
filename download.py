@@ -11,8 +11,9 @@ Usage:
 Options: 
     --user USER
     --pass PASS
-    --ical URL          [default: http://meds.queensu.ca/central/calendars/2020.ics]
+    --ical URL          [default: http://meds.queensu.ca/central/calendars/2021.ics]
     -v --verbose           
+    --debug
 """
 from __future__ import print_function
 from bs4 import BeautifulSoup
@@ -28,6 +29,11 @@ import shutil
 import urlparse
 
 VERBOSE = False
+DEBUG = False
+
+def debug(message): 
+    if DEBUG: 
+        print(color(message, 'white'))
 
 def log(message):
     if VERBOSE:
@@ -40,7 +46,7 @@ def download_resources(ical_data, login, fromdate):
     """
 
     if fromdate:
-        print(color("Ignoring dates earlier than {}".format(fromdate), 'yellow'))
+        log(color("Ignoring dates earlier than {}".format(fromdate), 'yellow'))
 
     # finally, create the content
     for event in ical.Calendar.from_ical(ical_data).walk("VEVENT"):
@@ -69,16 +75,16 @@ def download_resources(ical_data, login, fromdate):
             r = requests.post(source_url, data=login, stream=True)
 
             if 'Content-Disposition' not in r.headers: 
-                print(color("Skipping:", 'cyan'), link.attrs['href'], "from", event['url'], color("[No content disposition]", 'red'))
+                log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No content disposition]", 'red'))
                 continue
 
             label = link.find_next(class_="label-info")
             if not label: 
-                print(color("Skipping:", 'cyan'), link.attrs['href'], "from", event['url'], color("[No label]", 'red'))
+                log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No label]", 'red'))
                 continue
 
             if not (label.text.endswith("KB") or label.text.endswith("MB")): 
-                print(color("Skipping:", 'cyan'), link.attrs['href'], "from", event['url'], color("[No file size]", 'red'))
+                log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No file size]", 'red'))
                 continue
 
             # dirty removal of file size
@@ -91,18 +97,21 @@ def download_resources(ical_data, login, fromdate):
                 continue
 
             if os.path.exists(target_filename): 
-                print(color("Skipping:", 'cyan'), target_filename, color("[File exists]", 'red'))
+                log(color("Skipping: ", 'cyan') + target_filename + color(" [File exists]", 'red'))
                 continue
             else:
-                print(color("Downloading:", 'cyan'), target_filename)
+                log(color("Downloading: ", 'cyan') + target_filename)
                 with open(target_filename, 'wb') as f:
                     r.raw.decode_content = True
                     shutil.copyfileobj(r.raw, f)
 
 def main():
-    global VERBOSE
+    global VERBOSE, DEBUG
     arguments = docopt.docopt(__doc__)
     VERBOSE = arguments['--verbose']
+    DEBUG = arguments['--debug']
+
+    debug(arguments)
 
     fromdate = arguments['<date>'] and \
         dateutil.parser.parse(arguments['<date>']) or None
