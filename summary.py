@@ -141,9 +141,11 @@ def create_week_summary_page(ical_data, login, date):
 
     # links for navigation from week to week
     with _body.add(div(style="overflow:hidden")):
-        div(a("<< prev week", href=SITE_BASE + "/{}.html".format((start - datetime.timedelta(weeks=1)).date())),
+        prev_week = (start - datetime.timedelta(weeks=1)).date()
+        next_week = (start + datetime.timedelta(weeks=1)).date()
+        div(a("<< prev week", href="{}/{}.html".format(SITE_BASE, prev_week)),
             style="float:left;")
-        div(a("next week >>", href=SITE_BASE + "/{}.html".format((start + datetime.timedelta(weeks=1)).date())),
+        div(a("next week >>", href="{}/{}.html".format(SITE_BASE, next_week)), 
             style="float:right;")
 
     # finally, create the content
@@ -163,12 +165,12 @@ def create_week_summary_page(ical_data, login, date):
                 with div(_class="event-heading") as event_heading:
                     with div(_class="event-todo"): 
                         input_(id="chk_{}".format(eventid), type="checkbox", _class="todo"),
-                    with div(_class="event-title"):
+                    with div(_class = "event-title"):
                         h2(
                             event.decoded('summary'),
                             a(
                                 span(_class="icon-globe"),
-                                href=event['url'], style="font-size: x-small",
+                                href=eventurl, style="font-size: x-small",
                                 target="_blank"), 
                         )
 
