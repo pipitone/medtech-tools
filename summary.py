@@ -234,6 +234,10 @@ def create_week_summary_page(ical_data, login, date):
             localStorage.setItem($(this).attr('id'), $(this).prop('checked'));
         });
     });
+
+    $('.event-prep a').each(function(index, element) {
+        $(this).attr('target', '_blank');
+    });
     """
 
     with _html.body: 
