@@ -3,22 +3,22 @@
 Create medtech weekly summary pages
 
 This utility fetches the medtech calendar feed, and then visit each event page
-to scrape the required prep and other resources. 
+to scrape the required prep and other resources.
 
-Usage: 
+Usage:
     mt-summary.py [options] [<date>]
 
-Arguments: 
+Arguments:
     <date>              Week of interest
 
-Options: 
+Options:
     --user USER
     --pass PASS
-    --ical URL          [default: http://meds.queensu.ca/central/calendars/2020.ics]
+    --ical URL
     --pre-post-week     Emit pages for the week, previous and following week
     --link-index-html   Link index.html to the current summary page
     --site-base URL     [default: http://jon.pipitone.ca/medtech]
-    --verbose           
+    --verbose
     --debug
     --test-mode
 """
@@ -44,15 +44,18 @@ MT_BASE = "http://meds.queensu.ca/central"
 SITE_BASE = ""
 VERBOSE = False
 DEBUG = False
-TESTMODE=False
+TESTMODE = False
+
 
 def log(message, *args):
     if VERBOSE or DEBUG:
         print(str(message).format(*args))
 
-def debug(message, *args): 
+
+def debug(message, *args):
     if DEBUG:
         print("DEBUG: " + str(message).format(*args))
+
 
 def create_week_summary_page(ical_data, login, date):
     """Do the work of create the summary page
@@ -99,42 +102,58 @@ def create_week_summary_page(ical_data, login, date):
             rel='stylesheet',
             type=attrs['type']))
 
-    _html.head.add(script(type="text/javascript",
-                          src="/central/javascript/jquery/jquery.min.js?release=4.6.0.0"))
+    _html.head.add(
+        script(
+            type="text/javascript",
+            src="/central/javascript/jquery/jquery.min.js?release=4.6.0.0"))
 
     # some custome styling
     _html.head.add(style("""
-        body { 
-            margin: auto 10%; 
+        body {
+            margin: auto 10%;
         }
 
-        .no-prep h2 { 
-            color: lightgrey; 
-        } 
-
-        .date, .event, .event-heading, .event-prep { 
-            clear: both; 
+        .alert-box {
+            padding: 10px;
+            display: inline-block;
+            width: 100%;
+            background-color: rgba(255,255,25,0.1);
+            border: thin dashed lightgrey;
         }
+
+        .no-prep h2 {
+            color: lightgrey;
+        }
+
+        .date, .event, .event-heading, .event-prep {
+            clear: both;
+        }
+
+        .date-content {
+            padding-left: 10px;
+            margin-bottom: 3em;
+            clear: both;
+            float: left;
+        }
+
         .event-todo, .event-title {
             float: left;
         }
-        .event-todo input { 
+        .event-todo input {
             margin: 20px 10px;
         }
-        .event-prep { 
+        .event-prep {
             padding-left: 40px;
-        } 
+        }
 
-        .icon-globe { 
+        .icon-globe {
             vertical-align: baseline;
         }
         """, type="text/css"))
     _html.head.add(meta(charset="utf-8"))
     _body = _html.body
 
-    with _body.add(div(style=
-        "padding: 10px; display: inline-block; width: 100%; "
-        "background-color: rgba(255,255,25,0.1); border: thin dashed lightgrey;")):
+    with _body.add(div(_class="alert-box")):
 
         span("Note:", _class="label label-important event-resource-stat-label")
         text(" Click event headings to see preparation notes and materials.")
@@ -145,14 +164,14 @@ def create_week_summary_page(ical_data, login, date):
         next_week = (start + datetime.timedelta(weeks=1)).date()
         div(a("<< prev week", href="{}/{}.html".format(SITE_BASE, prev_week)),
             style="float:left;")
-        div(a("next week >>", href="{}/{}.html".format(SITE_BASE, next_week)), 
+        div(a("next week >>", href="{}/{}.html".format(SITE_BASE, next_week)),
             style="float:right;")
 
     # finally, create the content
     for date in sorted(weekday_events.keys()):
         log("Fetching content for date {}", date)
         _body.add(h1(date.strftime("%a, %b %d %Y"), _class="date"))
-        _datediv = div(style='padding-left: 10px; margin-bottom: 3em; clear: both; float: left;')
+        _datediv = div(_class="date-content")
         _body.add(_datediv)
 
         for event in weekday_events[date]:
@@ -161,17 +180,18 @@ def create_week_summary_page(ical_data, login, date):
             parsedquery = urlparse.parse_qs(parsedurl.query)
             eventid = parsedquery["id"][0]
 
-            with _datediv.add(div(_class="event")) as event_div: 
+            with _datediv.add(div(_class="event")) as event_div:
                 with div(_class="event-heading") as event_heading:
-                    with div(_class="event-todo"): 
-                        input_(id="chk_{}".format(eventid), type="checkbox", _class="todo"),
-                    with div(_class = "event-title"):
+                    with div(_class="event-todo"):
+                        input_(id="chk_{}".format(eventid),
+                               type="checkbox", _class="todo"),
+                    with div(_class="event-title"):
                         h2(
                             event.decoded('summary'),
                             a(
                                 span(_class="icon-globe"),
                                 href=eventurl, style="font-size: x-small",
-                                target="_blank"), 
+                                target="_blank"),
                         )
 
                 with div(_class="event-prep") as prep_div:
@@ -179,8 +199,8 @@ def create_week_summary_page(ical_data, login, date):
                     debug("Fetching event page: {}", eventurl)
                     page = requests.post(eventurl, data=login)
                     soup = BeautifulSoup(page.text, 'html.parser')
-                    
-                    has_prep = False 
+
+                    has_prep = False
 
                     # extract the "required preparation" section
                     req = soup.find_all("h3", text="Required Preparation")
@@ -191,14 +211,14 @@ def create_week_summary_page(ical_data, login, date):
 
                     # extract the event resources
                     res = soup.find_all(class_='resource-list')
-                    for reslist in res: 
+                    for reslist in res:
                         raw(unicode(reslist))
                         has_prep = True
 
                     if not has_prep:
                         event_heading['class'] += ' no-prep'
 
-                    if TESTMODE and len(_datediv.get()) >= 3: 
+                    if TESTMODE and len(_datediv.get()) >= 3:
                         break
 
     # a disclaimer
@@ -212,45 +232,12 @@ def create_week_summary_page(ical_data, login, date):
             a("github.com/pipitone/medtech-tools",
                 href="https://github.com/pipitone/medtech-tools"))
 
-    # inject some sweet javscript that makes headings collapse/expand
-    # visibility of their associated content
-    js = """
-    $('h1').each(function(index, element) {
-        $(this).click(function() { 
-            $(this).next('div').toggle();
-        });
-    });
+    with _html.body:
+        # inject some sweet javscript for functionality
+        script(open("js/summary.js").read(), type="text/javascript")
 
-    $('.event-title').each(function(index, element) {
-        $(this).parent('.event-heading').next('.event-prep').hide();
-        $(this).click(function() { 
-            $(this).parent('.event-heading').next('.event-prep').toggle();
-        });
-    });
-
-    $('.todo').each(function(index, element) {
-        $(this).prop('checked', localStorage.getItem($(this).attr('id')) == 'true');
-        $(this).change(function() { 
-            localStorage.setItem($(this).attr('id'), $(this).prop('checked'));
-        });
-    });
-
-    $('.event-prep a').each(function(index, element) {
-        $(this).attr('target', '_blank');
-    });
-    """
-
-    with _html.body: 
-        script(js, type="text/javascript")
-        script("""
-            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-            })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-
-            ga('create', 'UA-84357249-1', 'auto');
-            ga('send', 'pageview');
-            """, type="text/javascript")
+        # spy on people
+        script(open("js/google-analytics.js").read(), type="text/javascript")
 
     pagefile = open(outputfile, 'wb')
     pagefile.write(_html.__unicode__().encode('utf8'))
@@ -279,10 +266,10 @@ def main():
 
     ical_url = arguments['--ical']
 
-    if os.path.exists('.cached-feed.ics'): 
+    if os.path.exists('.cached-feed.ics'):
         log("Using cached feed .cached-feed.ics")
         ical_data = open('.cached-feed.ics').read()
-    else: 
+    else:
         log("Fetching ical feed {}", ical_url)
         ical_r = requests.get(ical_url)
         ical_data = ical_r.text
@@ -300,6 +287,7 @@ def main():
             ical_data, login, nowdate - datetime.timedelta(weeks=1))
         create_week_summary_page(
             ical_data, login, nowdate + datetime.timedelta(weeks=1))
+
 
 if __name__ == '__main__':
     main()
