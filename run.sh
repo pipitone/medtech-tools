@@ -23,4 +23,8 @@ case "$1" in
         shift;
         ./summary.py --user $USER --pass "$PASS" --ical "$ICAL" "$@"
         ;;
+
+    *)
+        echo "Usage: $0 (download|summary)"
+        echo
 esac;
