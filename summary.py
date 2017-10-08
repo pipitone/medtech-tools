@@ -212,6 +212,16 @@ def create_week_summary_page(ical_data, login, date):
                     # extract the event resources
                     res = soup.find_all(class_='resource-list')
                     for reslist in res:
+                        # snip out any quiz results :D
+                        try:
+                            label = reslist.find('span', string='Quiz')
+                            block = label.find_parent('ul', 'timeframe')
+                            score = block.find('ul', 'menu')
+                            score.extract()
+                            debug("quiz results removed...")
+                        except AttributeError, e:
+                            pass
+
                         raw(unicode(reslist))
                         has_prep = True
 
