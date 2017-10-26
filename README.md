@@ -8,6 +8,8 @@ Setup python and dependencies:
     source venv/bin/activate
     pip install -r requirements.txt
 
+    # If using Python < 2.7.9: 
+    pip install --upgrade pyOpenSSL ndg-httpsclient pyasn1  
 
 Configure access to MedTech. To do this, create the following files with your
 medtech password and calendar url: 
