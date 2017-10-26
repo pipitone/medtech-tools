@@ -9,7 +9,7 @@ Setup python and dependencies:
     pip install -r requirements.txt
 
     # If using Python < 2.7.9: 
-    pip install --upgrade pyOpenSSL ndg-httpsclient pyasn1  
+    pip install --upgrade pyOpenSSL ndg-httpsclient pyasn1 requests[security] 
 
 Configure access to MedTech. To do this, create the following files with your
 medtech password and calendar url: 
