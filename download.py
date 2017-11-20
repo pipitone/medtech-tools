@@ -92,6 +92,7 @@ def download_resources(ical_data, login, fromdate):
             
             source_filename = r.headers['Content-Disposition'].split('filename=')[-1].strip('"')
             target_filename = "data/" + " - ".join([course_code, formatted_date, class_title, file_kind, source_filename]).replace('/','_')
+            target_filename = target_filename.replace('\n','')
 
             if target_filename.endswith(".mp3"): 
                 continue
