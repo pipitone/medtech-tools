@@ -56,12 +56,16 @@ def download_resources(ical_data, login, fromdate):
             continue
 
         # fetch the medtech page content for the date
-        page = requests.post(event['url'], data=login)
+        url = event['url']
+        page = requests.post(url, data=login)
         soup = BeautifulSoup(page.text, 'html.parser')
         
-        course_code = soup.find(id='page-top').find_previous('a').text.split(":")[0]
-        formatted_date = date.strftime("%Y-%m-%d")
-        class_title = soup.find(id='page-top').text
+        try:     
+            course_code = soup.find(id='page-top').find_previous('a').text.split(":")[0]
+            formatted_date = date.strftime("%Y-%m-%d")
+            class_title = soup.find(id='page-top').text
+        except AttributeError, e: 
+            log("Malformed page at url: {}".format(url))
 
         # fetch all resources
         for link in soup.find_all("a", class_="resource-link"):
@@ -92,7 +96,7 @@ def download_resources(ical_data, login, fromdate):
             
             source_filename = r.headers['Content-Disposition'].split('filename=')[-1].strip('"')
             target_filename = "data/" + " - ".join([course_code, formatted_date, class_title, file_kind, source_filename]).replace('/','_')
-            target_filename = target_filename.replace('\n','')
+            target_filename = target_filename.replace('\n','')[:250]
 
             if target_filename.endswith(".mp3"): 
                 continue
