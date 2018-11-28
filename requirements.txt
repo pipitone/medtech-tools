@@ -4,6 +4,6 @@ dominate==2.3.1
 icalendar==3.11.2
 python-dateutil==2.6.0
 pytz==2016.10
-requests[security]==2.13.0
+requests[security]>=2.20.0
 six==1.10.0
 termcolor==1.1.0
