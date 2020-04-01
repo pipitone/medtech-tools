@@ -11,10 +11,13 @@ Usage:
 Options: 
     --user USER
     --pass PASS
-    --ical URL          [default: http://meds.queensu.ca/central/calendars/2021.ics]
+    --ical URL          [default: https://elentra.healthsci.queensu.ca/calendars/private-4fd4cecfffb5cde02dce2afdb81545d9/15jcp4.ics]
+    --youtube-dl        Display youtube-dl commands for video links
+    --dry-run        
     -v --verbose           
     --debug
 """
+# --ical URL          [default: http://meds.queensu.ca/central/calendars/2021.ics]
 from __future__ import print_function
 from bs4 import BeautifulSoup
 from termcolor import colored as color
@@ -24,12 +27,16 @@ import docopt
 import getpass
 import icalendar as ical
 import os.path
+import mechanize
 import requests
+import cgi
 import shutil
-import urlparse
+import re
 
 VERBOSE = False
 DEBUG = False
+YTDL = False
+DRYRUN = False
 
 def debug(message): 
     if DEBUG: 
@@ -48,6 +55,14 @@ def download_resources(ical_data, login, fromdate):
     if fromdate:
         log(color("Ignoring dates earlier than {}".format(fromdate), 'yellow'))
 
+    # login
+    br = mechanize.Browser()
+    r = br.open('https://elentra.healthsci.queensu.ca')
+    br.select_form(nr=0)
+    br['username'] = login['username']
+    br['password'] = login['password']
+    br.submit()
+
     # finally, create the content
     for event in ical.Calendar.from_ical(ical_data).walk("VEVENT"):
         date = event.decoded('dtstart').replace(tzinfo=None)
@@ -57,48 +72,57 @@ def download_resources(ical_data, login, fromdate):
 
         # fetch the medtech page content for the date
         url = event['url']
-        page = requests.post(url, data=login)
-        soup = BeautifulSoup(page.text, 'html.parser')
+        br.open(url)
+        soup = BeautifulSoup(br.response().read(), 'html.parser')
         
+        audience = soup.find('a', href=re.compile('^#audience'))
+        if not audience: 
+            log("Skipping " + url + " as does not appear to be for our class.")
+            continue
+        if audience.text != 'Class of 2020': 
+            log("Skipping " + url + " as does not appear to be for our class: " + audience.text)
+            continue
+
         try:     
-            course_code = soup.find(id='page-top').find_previous('a').text.split(":")[0]
+            course_code = soup.find('a', href=re.compile('courses.id')).text.split(":")[0]
             formatted_date = date.strftime("%Y-%m-%d")
-            class_title = soup.find(id='page-top').text
+            class_title = soup.find('h1', class_='event-title').text
         except AttributeError, e: 
             log("Malformed page at url: {}".format(url))
+            log(e)
+            continue
+
+        
+        if YTDL: 
+            target_filename = " ".join([course_code, formatted_date, class_title]).replace('/','_')
+
+            # video links
+            for link in soup.find_all('a', title=re.compile('stream.queensu.ca')): 
+                url = re.search('https.*', link.get('title')).group(0)
+                cmd = 'youtube-dl -o "'+target_filename+' - video.mp4" -q --no-warnings '+url
+                print(cmd)
 
         # fetch all resources
-        for link in soup.find_all("a", class_="resource-link"):
+        for link in soup.find_all("a", class_="resource-link", href=re.compile('file-event')):
             try: 
                 _, fileid =  link.attrs['href'].split('=')
             except:
                 continue
 
-            source_url = r"https://meds.queensu.ca/central/?url=%2Fmedicine%2Ffile-event.php%3Fid%3D"+fileid
+            source_url = r'https://elentra.healthsci.queensu.ca/file-event.php?id='+ fileid
 
-            r = requests.post(source_url, data=login, stream=True)
-
-            if 'Content-Disposition' not in r.headers: 
+            r = br.open(source_url)
+            cd = r.info().getheader('Content-Disposition')
+            if not cd:  
                 log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No content disposition]", 'red'))
                 continue
 
-            label = link.find_next(class_="label-info")
-            if not label: 
-                log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No label]", 'red'))
-                continue
-
-            if not (label.text.endswith("KB") or label.text.endswith("MB")): 
-                log(color("Skipping: ", 'cyan') + link.attrs['href'] + " from " + event['url'] + color(" [No file size]", 'red'))
-                continue
-
-            # dirty removal of file size
-            file_kind = " ".join(label.text.split()[:-2]) 
-            
-            source_filename = r.headers['Content-Disposition'].split('filename=')[-1].strip('"')
-            target_filename = "data/" + " - ".join([course_code, formatted_date, class_title, file_kind, source_filename]).replace('/','_')
+            _, cd_params = cgi.parse_header(cd)
+            source_filename = '- ' + cd_params['filename']
+            target_filename = "data/" + " ".join([course_code, formatted_date, class_title, source_filename]).replace('/','_')
             target_filename = target_filename.replace('\n','')[:250]
 
-            if target_filename.endswith(".mp3"): 
+            if source_filename.endswith(".mp3") or source_filename.endswith('.m4a'): 
                 continue
 
             if os.path.exists(target_filename): 
@@ -106,15 +130,17 @@ def download_resources(ical_data, login, fromdate):
                 continue
             else:
                 log(color("Downloading: ", 'cyan') + target_filename)
-                with open(target_filename, 'wb') as f:
-                    r.raw.decode_content = True
-                    shutil.copyfileobj(r.raw, f)
+                if not DRYRUN:
+                    with open(target_filename, 'wb') as f:
+                        f.write(r.read())
 
 def main():
-    global VERBOSE, DEBUG
+    global VERBOSE, DEBUG, YTDL, DRYRUN
     arguments = docopt.docopt(__doc__)
     VERBOSE = arguments['--verbose']
     DEBUG = arguments['--debug']
+    YTDL = arguments['--youtube-dl']
+    DRYRUN = arguments['--dry-run']
 
     debug(arguments)
 
@@ -123,9 +149,7 @@ def main():
 
     login = {
         'username': arguments['--user'] or raw_input("MEdTech username: "),
-        'password': arguments['--pass'] or getpass.getpass(),
-        'submit': 'Login',
-        'action': 'login'}
+        'password': arguments['--pass'] or getpass.getpass()}
 
     log("Downloading calendar...")
     ical_url = arguments['--ical']
