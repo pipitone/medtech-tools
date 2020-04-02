@@ -100,7 +100,8 @@ def download_resources(ical_data, login, fromdate):
             for link in soup.find_all('a', title=re.compile('stream.queensu.ca')): 
                 url = re.search('https.*', link.get('title')).group(0)
                 cmd = 'youtube-dl -o "'+target_filename+' - video.mp4" -q --no-warnings '+url
-                print(cmd)
+                log(cmd)
+                open('youtube-dl.txt', 'a').write(cmd+'\n')
 
         # fetch all resources
         for link in soup.find_all("a", class_="resource-link", href=re.compile('file-event')):
