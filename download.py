@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Download medtech event resources
 
@@ -18,7 +18,6 @@ Options:
     --debug
 """
 # --ical URL          [default: http://meds.queensu.ca/central/calendars/2021.ics]
-from __future__ import print_function
 from bs4 import BeautifulSoup
 from termcolor import colored as color
 import datetime
@@ -43,7 +42,7 @@ def debug(message):
         print(color(message, 'white'))
 
 def log(message):
-    if VERBOSE:
+    if VERBOSE or DEBUG:
         print(color(message, 'white'))
 
 def download_resources(ical_data, login, fromdate):
@@ -87,7 +86,7 @@ def download_resources(ical_data, login, fromdate):
             course_code = soup.find('a', href=re.compile('courses.id')).text.split(":")[0]
             formatted_date = date.strftime("%Y-%m-%d")
             class_title = soup.find('h1', class_='event-title').text
-        except AttributeError, e: 
+        except AttributeError as e: 
             log("Malformed page at url: {}".format(url))
             log(e)
             continue
@@ -149,7 +148,7 @@ def main():
         dateutil.parser.parse(arguments['<date>']) or None
 
     login = {
-        'username': arguments['--user'] or raw_input("MEdTech username: "),
+        'username': arguments['--user'] or input("MEdTech username: "),
         'password': arguments['--pass'] or getpass.getpass()}
 
     log("Downloading calendar...")
