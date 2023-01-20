@@ -5,7 +5,7 @@ docopt==0.6.2
 html5lib==1.0.1
 icalendar==4.0.5
 idna==2.9
-mechanize==0.4.5
+mechanize==0.4.6
 python-dateutil==2.8.1
 pytz==2020.1
 requests==2.23.0
